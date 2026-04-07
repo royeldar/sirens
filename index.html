@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Israel Alerts Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            background: #f0f0f0;
+            font-family: sans-serif;
+        }
+        #ui { margin-bottom: 20px; display: flex; gap: 10px; }
+        #container { background: white; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <label>City: <input type="text" id="city"></label>
+        <label>From: <input type="text" id="start-date" placeholder="DD.MM.YYYYThh:mm:ss"></label>
+        <label>To: <input type="text" id="end-date" placeholder="DD.MM.YYYYThh:mm:ss"></label>
+        <label><input type="checkbox" id="missiles" checked> Missiles</label>
+        <label><input type="checkbox" id="aircraft-intrusion" checked> Aircraft Intrusion</label>
+        <button onclick="loadData()">Generate Chart</button>
+    </div>
+    <div id="container"></div>
+
+    <script>
+        const CSV_URL = 'https://raw.githubusercontent.com/dleshem/israel-alerts-data/refs/heads/main/israel-alerts.csv';
+
+        const MISSILE_ALARM = [
+            [1, '\u05d9\u05e8\u05d9 \u05e8\u05e7\u05d8\u05d5\u05ea \u05d5\u05d8\u05d9\u05dc\u05d9\u05dd'],
+        ];
+        const MISSILE_WARNING = [
+            [14, '\u05d1\u05d3\u05e7\u05d5\u05ea \u05d4\u05e7\u05e8\u05d5\u05d1\u05d5\u05ea \u05e6\u05e4\u05d5\u05d9\u05d5\u05ea \u05dc\u05d4\u05ea\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05d1\u05d0\u05d6\u05d5\u05e8\u05da'],
+            [14, '\u05d1\u05d3\u05e7\u05d5\u05ea \u05d4\u05e7\u05e8\u05d5\u05d1\u05d5\u05ea \u05e6\u05e4\u05d5\u05d9\u05d5\u05ea \u05dc\u05d4\u05ea\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05d1\u05d0\u05d9\u05d6\u05d5\u05e8\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd:'],
+            [14, '\u05e9\u05d4\u05d9\u05d9\u05d4 \u05d1\u05e1\u05de\u05d9\u05db\u05d5\u05ea \u05dc\u05de\u05e8\u05d7\u05d1 \u05de\u05d5\u05d2\u05df'],
+            [14, '\u05d9\u05e9 \u05dc\u05e9\u05d4\u05d5\u05ea \u05d1\u05e1\u05de\u05d9\u05db\u05d5\u05ea \u05dc\u05de\u05e8\u05d7\u05d1 \u05d4\u05de\u05d5\u05d2\u05df'],
+        ];
+        const MISSILE_MESSAGE = [
+            [13, '\u05d9\u05e8\u05d9 \u05e8\u05e7\u05d8\u05d5\u05ea \u05d5\u05d8\u05d9\u05dc\u05d9\u05dd -  \u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd'],
+            [13, '\u05e0\u05d9\u05ea\u05df \u05dc\u05e6\u05d0\u05ea \u05de\u05d4\u05de\u05e8\u05d7\u05d1 \u05d4\u05de\u05d5\u05d2\u05df \u05d0\u05da \u05d9\u05e9 \u05dc\u05d4\u05d9\u05e9\u05d0\u05e8 \u05d1\u05e7\u05e8\u05d1\u05ea\u05d5'],
+            [13, '\u05e1\u05d9\u05d5\u05dd \u05e9\u05d4\u05d9\u05d9\u05d4 \u05d1\u05e1\u05de\u05d9\u05db\u05d5\u05ea \u05dc\u05de\u05e8\u05d7\u05d1 \u05d4\u05de\u05d5\u05d2\u05df'],
+            [13, '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd'],
+        ];
+        const AIRCRAFT_INTRUSION_ALARM = [
+            [2, '\u05d7\u05d3\u05d9\u05e8\u05ea \u05db\u05dc\u05d9 \u05d8\u05d9\u05e1 \u05e2\u05d5\u05d9\u05df'],
+        ];
+        const AIRCRAFT_INTRUSION_MESSAGE = [
+            [13, '\u05d7\u05d3\u05d9\u05e8\u05ea \u05db\u05dc\u05d9 \u05d8\u05d9\u05e1 \u05e2\u05d5\u05d9\u05df - \u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd'],
+            [13, '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd'],
+        ];
+        const ALL_CITIES = '\u05d1\u05e8\u05d7\u05d1\u05d9 \u05d4\u05d0\u05e8\u05e5';
+
+        function parseDate(dateStr) {
+            const [datePart, timePart] = dateStr.split('T');
+            const [day, month, year] = datePart.split('.');
+            const [hours, minutes, seconds] = timePart.split(':');
+
+            return new Date(year, month - 1, day, hours, minutes, seconds);
+        }
+
+        function toDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return year + '-' + month + '-' + day;
+        }
+
+        function toDateShort(dateString) {
+            const [year, month, day] = dateString.split('-');
+            return day + '.' + month;
+        }
+
+        function toHour(hour) {
+            return hour.toString().padStart(2, '0') + ':00';
+        }
+
+        function loadData() {
+            fetch(CSV_URL)
+                .then(response => response.text())
+                .then(raw => {
+                    const lines = raw.trim().split('\n');
+                    const rawData = lines.map(row => row.split(','));
+                    const timeline = processData(rawData);
+                    const container = document.getElementById('container');
+                    container.innerHTML = '';
+                    drawChart(timeline, container);
+                });
+        }
+
+        const WARNING = 1;
+        const ALARM = 2;
+        const QUIET = 3;
+
+        function processData(rawData) {
+            const targetCity = document.getElementById('city').value;
+            const missiles = document.getElementById('missiles').checked;
+            const aircraftIntrusion = document.getElementById('aircraft-intrusion').checked;
+            const startDateStr = document.getElementById('start-date').value;
+            const endDateStr = document.getElementById('end-date').value;
+            const startDate = parseDate(startDateStr);
+            let endDate;
+            if (endDateStr !== '') {
+                endDate = parseDate(endDateStr);
+            } else {
+                endDate = new Date();
+            }
+
+            let alerts = [];
+
+            const headers = rawData[0];
+            const dataRows = rawData.slice(1);
+            const idx = {
+                date: headers.indexOf('date'),
+                time: headers.indexOf('time'),
+                data: headers.indexOf('data'),
+                category: headers.indexOf('category'),
+                category_desc: headers.indexOf('category_desc')
+            };
+
+            dataRows.forEach(row => {
+                const city = row[idx.data];
+                if (city !== targetCity && city !== ALL_CITIES) {
+                    return;
+                }
+                const category = parseInt(row[idx.category]);
+                const category_desc = row[idx.category_desc];
+                const alert_date = row[idx.date] + 'T' + row[idx.time];
+                const date = parseDate(alert_date);
+                if (date >= startDate && date <= endDate) {
+                    if (missiles) {
+                        if (MISSILE_WARNING.some(m => m[0] === category && m[1] === category_desc)) {
+                            alerts.push([date, WARNING]);
+                        } else if (MISSILE_ALARM.some(m => m[0] === category && m[1] === category_desc)) {
+                            alerts.push([date, ALARM]);
+                        } else if (MISSILE_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
+                            alerts.push([date, QUIET]);
+                        }
+                    }
+                    if (aircraftIntrusion) {
+                        if (AIRCRAFT_INTRUSION_ALARM.some(m => m[0] === category && m[1] === category_desc)) {
+                            alerts.push([date, ALARM]);
+                        } else if (AIRCRAFT_INTRUSION_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
+                            alerts.push([date, QUIET]);
+                        }
+                    }
+                }
+            });
+
+            console.log('Done processing csv! There are ' + alerts.length + ' alerts.');
+
+            alerts.sort((a, b) => {
+                if (a[0] < b[0]) return -1;
+                if (a[0] > b[0]) return 1;
+
+                if (a[1] < b[1]) return -1;
+                if (a[1] > b[1]) return 1;
+
+                return 0;
+            });
+
+            alerts.unshift([startDate, QUIET]);
+
+            let events = [];
+
+            const targets = {
+                [WARNING]: [ALARM, QUIET],
+                [ALARM]: [QUIET],
+                [QUIET]: [WARNING, ALARM]
+            };
+
+            for (let i = 0; i < alerts.length; ) {
+                const [timestamp, event] = alerts[i];
+                let next_timestamp = endDate;
+                let next_i = alerts.length;
+
+                for (let j = i + 1; j < alerts.length; j++) {
+                    if (targets[event].includes(alerts[j][1])) {
+                        next_timestamp = alerts[j][0];
+                        next_i = j;
+                        break;
+                    }
+                }
+
+                if (next_timestamp > timestamp) {
+                    events.push([timestamp, next_timestamp, event]);
+                }
+
+                i = next_i;
+            }
+
+            let timeline = {};
+
+            let currentDay = new Date(startDate);
+            currentDay.setHours(0, 0, 0, 0);
+
+            let lastDay = new Date(endDate);
+            lastDay.setHours(0, 0, 0, 0);
+
+            while (currentDay <= lastDay) {
+                const dayKey = toDate(currentDay);
+
+                timeline[dayKey] = {
+                    [QUIET]: [],
+                    [WARNING]: [],
+                    [ALARM]: []
+                };
+
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+
+            for (const [eventStart, eventEnd, event] of events) {
+                let currentStart = new Date(eventStart);
+
+                while (currentStart < eventEnd) {
+                    const dayKey = toDate(currentStart);
+
+                    let nextStart = new Date(currentStart);
+                    nextStart.setDate(nextStart.getDate() + 1);
+                    nextStart.setHours(0, 0, 0, 0);
+
+                    let currentEnd = eventEnd < nextStart ? eventEnd : nextStart;
+
+                    if (timeline[dayKey]) {
+                        timeline[dayKey][event].push([new Date(currentStart), new Date(currentEnd)]);
+                    }
+
+                    currentStart = nextStart;
+                }
+            }
+
+            return timeline;
+        }
+
+        function drawChart(timeline, container) {
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+            const dpi = 100;
+            const rowWidth = 12.0;
+            const rowHeight = 0.25;
+            const ylabelOffset = -0.5;
+            const ylabelFontsize = (12.0 / 72) * dpi;
+            const xmajorLength = (3.5 / 72) * dpi;
+            const xminorLength = (2.0 / 72) * dpi;
+            const xlabelPad = (4.5 / 72) * dpi;
+            const xlabelFontsize = (10.0 / 72) * dpi;
+            const xlabelRotation = -60;
+            const gridLineWidth = (0.8 / 72) * dpi;
+            const gridLineAlpha = 0.5;
+            const borderWidth = (0.8 / 72) * dpi;
+
+            const width = rowWidth * dpi;
+            const gapWidth = -ylabelOffset * width / 24;
+            const maxTextWidth = ylabelFontsize * 0.7 * 5;
+            const leftMargin = maxTextWidth + gapWidth;
+            const gapHeight = xmajorLength + xlabelPad;
+            const bottomMargin = gapHeight + maxTextWidth;
+            const rightMargin = 20;
+            const totalWidth = leftMargin + width + rightMargin;
+            const nDays = Object.keys(timeline).length;
+            const height = nDays * rowHeight * dpi;
+            const totalHeight = height + bottomMargin;
+
+            svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalHeight}`);
+            svg.setAttribute("width", totalWidth);
+            svg.setAttribute("height", totalHeight);
+
+            const colors = {
+                [QUIET]: 'green',
+                [WARNING]: 'yellow',
+                [ALARM]: 'red'
+            };
+
+            Object.entries(timeline).sort().forEach(([day, events], i) => {
+                const y = i * rowHeight * dpi;
+                for (const [event, color] of Object.entries(colors)) {
+                    const segments = events[event] || [];
+                    segments.forEach(([start, end]) => {
+                        const h1 = start.getHours() + start.getMinutes() / 60 + start.getSeconds() / 3600;
+                        let h2;
+                        startDay = new Date(start).setHours(0, 0, 0, 0);
+                        endDay = new Date(end).setHours(0, 0, 0, 0);
+                        if (endDay > startDay) {
+                            h2 = 24;
+                        } else {
+                            h2 = end.getHours() + end.getMinutes() / 60 + end.getSeconds() / 3600;
+                        }
+                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        rect.setAttribute("x", leftMargin + h1 * (width / 24));
+                        rect.setAttribute("y", y);
+                        rect.setAttribute("width", (h2 - h1) * (width / 24));
+                        rect.setAttribute("height", rowHeight * dpi);
+                        rect.setAttribute("fill", color);
+                        svg.appendChild(rect);
+                    });
+                }
+
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.textContent = toDateShort(day);
+                text.setAttribute("x", maxTextWidth);
+                text.setAttribute("y", y + (rowHeight * dpi) / 2);
+                text.setAttribute("dominant-baseline", "central");
+                text.setAttribute("text-anchor", "end");
+                text.setAttribute("font-size", ylabelFontsize + "px");
+                svg.appendChild(text);
+            });
+
+            for (let h = 0; h <= 24; h++) {
+                const x = leftMargin + h * (width / 24);
+                const tick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                tick.setAttribute("x1", x);
+                tick.setAttribute("x2", x);
+                tick.setAttribute("y1", height);
+                tick.setAttribute("y2", height + xmajorLength);
+                tick.setAttribute("stroke", "black");
+                svg.appendChild(tick);
+
+                if (h < 24) {
+                    const x = leftMargin + (h + 0.5) * (width / 24);
+                    const tick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    tick.setAttribute("x1", x);
+                    tick.setAttribute("x2", x);
+                    tick.setAttribute("y1", height);
+                    tick.setAttribute("y2", height + xminorLength);
+                    tick.setAttribute("stroke", "black");
+                    svg.appendChild(tick);
+                }
+
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                const y = height + gapHeight;
+                text.textContent = toHour(h < 24 ? h : 0);
+                text.setAttribute("x", x);
+                text.setAttribute("y", y);
+                text.setAttribute("dominant-baseline", "central");
+                text.setAttribute("text-anchor", "end");
+                text.setAttribute("font-size", xlabelFontsize + "px");
+                text.setAttribute("transform", `rotate(${xlabelRotation}, ${x}, ${y})`);
+                svg.appendChild(text);
+            }
+
+            for (let h = 1; h < 24; h++) {
+                const x = leftMargin + h * (width / 24);
+                const gridLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                gridLine.setAttribute("x1", x);
+                gridLine.setAttribute("x2", x);
+                gridLine.setAttribute("y1", 0);
+                gridLine.setAttribute("y2", height);
+                gridLine.setAttribute("stroke", "black");
+                gridLine.setAttribute("stroke-opacity", gridLineAlpha);
+                gridLine.setAttribute("stroke-dasharray", "1, 2");
+                gridLine.setAttribute("stroke-width", gridLineWidth);
+                svg.appendChild(gridLine);
+            }
+
+            for (let i = 1; i < nDays; i++) {
+                const y = i * rowHeight * dpi;
+                const gridLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                gridLine.setAttribute("x1", leftMargin);
+                gridLine.setAttribute("x2", leftMargin + width);
+                gridLine.setAttribute("y1", y);
+                gridLine.setAttribute("y2", y);
+                gridLine.setAttribute("stroke", "black");
+                gridLine.setAttribute("stroke-opacity", gridLineAlpha);
+                gridLine.setAttribute("stroke-dasharray", "1, 2"); 
+                gridLine.setAttribute("stroke-width", gridLineWidth);
+                svg.appendChild(gridLine);
+            }
+
+            const border = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            border.setAttribute("x", leftMargin);
+            border.setAttribute("y", 0);
+            border.setAttribute("width", width);
+            border.setAttribute("height", height);
+            border.setAttribute("fill", "none");
+            border.setAttribute("stroke", "black");
+            border.setAttribute("stroke-width", borderWidth);
+            svg.appendChild(border);
+
+            container.appendChild(svg);
+        }
+    </script>
+</body>
+</html>
