@@ -24,7 +24,8 @@
         <label>To: <input type="text" id="end-date" placeholder="DD.MM.YYYYThh:mm:ss"></label>
         <label><input type="checkbox" id="missiles" checked> Missiles</label>
         <label><input type="checkbox" id="aircraft-intrusion" checked> Aircraft Intrusion</label>
-        <button onclick="loadData()">Generate Chart</button>
+        <button id="load-button" onclick="loadData()">Load Data</button>
+        <button onclick="generateChart()">Generate Chart</button>
     </div>
     <div id="container"></div>
 
@@ -79,17 +80,46 @@
             return hour.toString().padStart(2, '0') + ':00';
         }
 
+        let csvData = null;
+
         function loadData() {
+            const button = document.getElementById("load-button");
+
+            button.disabled = true;
+            button.textContent = "Downloading...";
+            button.style.backgroundColor = "";
+
             fetch(CSV_URL)
-                .then(response => response.text())
-                .then(raw => {
-                    const lines = raw.trim().split('\n');
-                    const rawData = lines.map(row => row.split(','));
-                    const timeline = processData(rawData);
-                    const container = document.getElementById('container');
-                    container.innerHTML = '';
-                    drawChart(timeline, container);
+                .then(response => {
+                    if (!response.ok) throw new Error();
+                    return response.text();
+                })
+                .then(text => {
+                    const lines = text.trim().split('\n');
+                    csvData = lines.map(row => row.split(','));
+                    button.disabled = false;
+                    button.textContent = "Data Loaded";
+                    button.style.backgroundColor = "lightgreen";
+                })
+                .catch(err => {
+                    alert("Failed to load data.");
+                    button.disabled = false;
+                    button.textContent = "Load Data";
+                    button.style.backgroundColor = "";
                 });
+        }
+
+        function generateChart() {
+            const container = document.getElementById("container");
+
+            if (csvData === null) {
+                alert("Please load the data first.");
+                return;
+            }
+
+            const timeline = processData(csvData);
+            container.innerHTML = '';
+            drawChart(timeline, container);
         }
 
         const WARNING = 1;
