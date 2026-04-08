@@ -312,8 +312,8 @@
                     segments.forEach(([start, end]) => {
                         const h1 = start.getHours() + start.getMinutes() / 60 + start.getSeconds() / 3600;
                         let h2;
-                        startDay = new Date(start).setHours(0, 0, 0, 0);
-                        endDay = new Date(end).setHours(0, 0, 0, 0);
+                        const startDay = new Date(start).setHours(0, 0, 0, 0);
+                        const endDay = new Date(end).setHours(0, 0, 0, 0);
                         if (endDay > startDay) {
                             h2 = 24;
                         } else {
