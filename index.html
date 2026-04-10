@@ -49,6 +49,9 @@
         <label>To: <input type="text" id="end-date" placeholder="DD.MM.YYYYThh:mm:ss"></label>
         <label><input type="checkbox" id="missiles" checked> Missiles</label>
         <label><input type="checkbox" id="aircraft-intrusion" checked> Aircraft Intrusion</label>
+        <hr style="width:100%; border:0; border-top:1px solid #ccc;">
+        <label><input type="checkbox" id="auto-quiet"> Auto-Quiet</label>
+        <label>After (mins): <input type="number" id="quiet-threshold" value="10" style="width:50px"></label>
         <button id="load-button" onclick="loadData()">Load Data</button>
         <button onclick="generateChart()">Generate Chart</button>
     </div>
@@ -155,6 +158,8 @@
             const targetCity = document.getElementById('city').value;
             const missiles = document.getElementById('missiles').checked;
             const aircraftIntrusion = document.getElementById('aircraft-intrusion').checked;
+            const autoQuiet = document.getElementById('auto-quiet').checked;
+            const quietMins = parseInt(document.getElementById('quiet-threshold').value);
             const startDateStr = document.getElementById('start-date').value;
             const endDateStr = document.getElementById('end-date').value;
             const startDate = parseDate(startDateStr);
@@ -192,14 +197,14 @@
                             alerts.push([date, WARNING]);
                         } else if (MISSILE_ALARM.some(m => m[0] === category && m[1] === category_desc)) {
                             alerts.push([date, ALARM]);
-                        } else if (MISSILE_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
+                        } else if (!autoQuiet && MISSILE_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
                             alerts.push([date, QUIET]);
                         }
                     }
                     if (aircraftIntrusion) {
                         if (AIRCRAFT_INTRUSION_ALARM.some(m => m[0] === category && m[1] === category_desc)) {
                             alerts.push([date, ALARM]);
-                        } else if (AIRCRAFT_INTRUSION_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
+                        } else if (!autoQuiet && AIRCRAFT_INTRUSION_MESSAGE.some(m => m[0] === category && m[1] === category_desc)) {
                             alerts.push([date, QUIET]);
                         }
                     }
@@ -217,6 +222,21 @@
 
                 return 0;
             });
+
+            if (autoQuiet) {
+                let newAlerts = [];
+                for (let i = 0; i < alerts.length; i++) {
+                    newAlerts.push(alerts[i]);
+                    const currentTimestamp = alerts[i][0].getTime();
+                    const nextTimestamp = (i + 1 < alerts.length) ? alerts[i+1][0].getTime() : endDate.getTime();
+                    const quietMs = quietMins * 60000;
+                    if ((nextTimestamp - currentTimestamp) > quietMs) {
+                        const quietAlert = [new Date(currentTimestamp + quietMs), QUIET];
+                        newAlerts.push(quietAlert);
+                    }
+                }
+                alerts = newAlerts;
+            }
 
             alerts.unshift([startDate, QUIET]);
 
