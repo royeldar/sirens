@@ -101,7 +101,7 @@
 
         function toDateShort(dateString) {
             const [year, month, day] = dateString.split('-');
-            return day + '.' + month;
+            return day + '.' + month + '.' + year.slice(-2);
         }
 
         function toHour(hour) {
@@ -330,7 +330,7 @@
 
             const width = rowWidth * dpi;
             const gapWidth = -ylabelOffset * width / 24;
-            const maxTextWidth = ylabelFontsize * 0.7 * 5;
+            const maxTextWidth = ylabelFontsize * 0.7 * 8;
             const leftMargin = maxTextWidth + gapWidth;
             const gapHeight = xmajorLength + xlabelPad;
             const bottomMargin = gapHeight + maxTextWidth;
